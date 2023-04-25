@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import Web3 from "web3"; // eslint-disable-line no-unused-vars
 import "./App.css";
 
+
+//TODO: Make it so that users can vote once on each proposal, currently users can only vote once on any proposal
 const VotingApp = () => {
   const [web3, setWeb3] = useState(null);
   const [accounts, setAccounts] = useState([]);
@@ -9,6 +11,8 @@ const VotingApp = () => {
   const [proposalsCount, setProposalsCount] = useState(0); // eslint-disable-line no-unused-vars
   const [proposals, setProposals] = useState([]);
   const [description, setDescription] = useState("");
+  const [userVoted, setUserVoted] = useState({});
+
 
   useEffect(() => {
     const init = async () => {
@@ -208,30 +212,60 @@ const VotingApp = () => {
             "constant": true
           }
         ];
-        const contractAddress = 0x7ba03C93335118B9f6cE9F1d6D2955f35cB9ee63;
+        const contractAddress = "0x7ba03C93335118B9f6cE9F1d6D2955f35cB9ee63";
         const contractInstance = new web3Instance.eth.Contract(contractABI, contractAddress);
         setContract(contractInstance);
 
         const proposalsCount = await contractInstance.methods.proposalsCount().call();
         setProposalsCount(proposalsCount);
 
-        let proposalsArray = [];
+        let fetchedProposals = [];
+        let userVotedStatus = {}; // Declare the variable here
         for (let i = 1; i <= proposalsCount; i++) {
           const proposal = await contractInstance.methods.getProposal(i).call();
-          proposalsArray.push(proposal);
+          const userVoted = await contractInstance.methods.proposalVoters(i, accounts[0]).call();
+          userVotedStatus[i] = userVoted;
+          fetchedProposals.push(proposal);
         }
-        setProposals(proposalsArray);
+        setProposals(fetchedProposals);
+        setUserVoted(userVotedStatus);
+
+        //testing
+        console.log("Fetched proposals:", fetchedProposals);
       }
     };
 
     init();
   }, []);
 
+  const connectMetaMask = async () => {
+    if (window.ethereum) {
+      try {
+        const accounts = await window.ethereum.request({
+          method: "eth_requestAccounts",
+        });
+        setAccounts(accounts);
+      } catch (error) {
+        console.error("User denied account access");
+      }
+    } else {
+      console.error("MetaMask is not installed");
+    }
+  };
+
   const createProposal = async () => {
     try {
       if (description) {
-        await contract.methods.addProposal(description).send({ from: accounts[0] });
-        window.location.reload();
+        await contract.methods.addProposal(description).send({ from: accounts[0], gas: 5000000 });
+
+        // Add the newly created proposal to the state
+        const newProposal = {
+          id: proposalsCount + 1,
+          description,
+          voteCount: 0,
+        };
+        setProposals([...proposals, newProposal]);
+        setDescription("");
       }
     } catch (error) {
       console.error("Error while creating proposal:", error.message || error);
@@ -239,13 +273,37 @@ const VotingApp = () => {
   };
 
   const vote = async (proposalId) => {
-    await contract.methods.vote(proposalId).send({ from: accounts[0] });
-    window.location.reload();
+    try {
+      await contract.methods.vote(proposalId).send({ from: accounts[0], gas: 5000000 });
+
+      // Update the vote count for the voted proposal
+      setProposals((prevProposals) =>
+          prevProposals.map((proposal) => {
+            if (proposal.id === proposalId) {
+              return { ...proposal, voteCount: proposal.voteCount + 1 };
+            }
+            return proposal;
+          })
+      );
+
+      // Update the userVoted state for the voted proposal
+      setUserVoted({ ...userVoted, [proposalId]: true });
+
+    } catch (error) {
+      console.error("Error while voting:", error.message || error);
+    }
   };
+
+
 
   return (
       <div className="App">
         <h1>Voting DApp</h1>
+        {!accounts.length && (
+            <div>
+              <button onClick={connectMetaMask}>Connect MetaMask</button>
+            </div>
+        )}
         <h2>Create Proposal</h2>
         <input
             type="text"
@@ -259,12 +317,19 @@ const VotingApp = () => {
           {proposals.map((proposal) => (
               <li key={proposal.id}>
                 {proposal.description} - Votes: {proposal.voteCount}
-                <button onClick={() => vote(proposal.id)}>Vote</button>
+                <button
+                    onClick={() => vote(proposal.id)}
+                    disabled={userVoted[proposal.id] || false}
+                >
+                  Vote
+                </button>
               </li>
           ))}
         </ul>
+
       </div>
   );
+
 };
 
 export default VotingApp;

@@ -10,6 +10,7 @@ contract Voting {
     address public owner;
     mapping(address => bool) public voters;
     mapping(uint => Proposal) public proposals;
+    mapping(uint => mapping(address => bool)) public proposalVoters;
     uint public proposalsCount;
 
     event ProposalCreated(uint indexed proposalId, string description);
@@ -35,14 +36,16 @@ contract Voting {
         emit ProposalCreated(proposalsCount, _description);
     }
 
-    function vote(uint _proposalId) public notVoted(msg.sender) {
+    function vote(uint _proposalId) public {
         require(_proposalId > 0 && _proposalId <= proposalsCount, "Invalid proposal ID");
+        require(!proposalVoters[_proposalId][msg.sender], "Already voted on this proposal");
 
-        voters[msg.sender] = true;
+        proposalVoters[_proposalId][msg.sender] = true;
         proposals[_proposalId].voteCount++;
 
         emit Voted(_proposalId, msg.sender);
     }
+
 
     function getProposal(uint _proposalId) public view returns (Proposal memory) {
         require(_proposalId > 0 && _proposalId <= proposalsCount, "Invalid proposal ID");
