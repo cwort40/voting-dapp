@@ -11,7 +11,6 @@ const VotingApp = () => {
   const [proposalsCount, setProposalsCount] = useState(0); // eslint-disable-line no-unused-vars
   const [proposals, setProposals] = useState([]);
   const [description, setDescription] = useState("");
-  const [userVoted, setUserVoted] = useState({});
 
 
   useEffect(() => {
@@ -23,9 +22,8 @@ const VotingApp = () => {
         const accounts = await web3Instance.eth.getAccounts();
         setAccounts(accounts);
 
-        const networkId = await web3Instance.eth.net.getId(); // eslint-disable-line no-unused-vars
+        const networkId = await web3Instance.eth.net.getId();
 
-        // Replace the following ABI and contract address with your own
         const contractABI = [
           {
             "inputs": [],
@@ -216,27 +214,30 @@ const VotingApp = () => {
         const contractInstance = new web3Instance.eth.Contract(contractABI, contractAddress);
         setContract(contractInstance);
 
-        const proposalsCount = await contractInstance.methods.proposalsCount().call();
+        const proposalsCount = await contractInstance.methods
+            .proposalsCount()
+            .call();
         setProposalsCount(proposalsCount);
 
         let fetchedProposals = [];
-        let userVotedStatus = {}; // Declare the variable here
+        // Remove userVotedStatus variable and logic from here
         for (let i = 1; i <= proposalsCount; i++) {
           const proposal = await contractInstance.methods.getProposal(i).call();
-          const userVoted = await contractInstance.methods.proposalVoters(i, accounts[0]).call();
-          userVotedStatus[i] = userVoted;
           fetchedProposals.push(proposal);
         }
         setProposals(fetchedProposals);
-        setUserVoted(userVotedStatus);
-
-        //testing
-        console.log("Fetched proposals:", fetchedProposals);
       }
     };
 
     init();
   }, []);
+
+
+  useEffect(() => {
+    console.log("Updated proposals count:", proposalsCount);
+  }, [proposalsCount]);
+
+
 
   const connectMetaMask = async () => {
     if (window.ethereum) {
@@ -260,7 +261,7 @@ const VotingApp = () => {
 
         // Add the newly created proposal to the state
         const newProposal = {
-          id: proposalsCount + 1,
+          id: proposals.length + 1,
           description,
           voteCount: 0,
         };
@@ -273,26 +274,29 @@ const VotingApp = () => {
   };
 
   const vote = async (proposalId) => {
+    console.log("Voting for proposal ID:", proposalId);
+
     try {
       await contract.methods.vote(proposalId).send({ from: accounts[0], gas: 5000000 });
 
       // Update the vote count for the voted proposal
-      setProposals((prevProposals) =>
-          prevProposals.map((proposal) => {
-            if (proposal.id === proposalId) {
-              return { ...proposal, voteCount: proposal.voteCount + 1 };
-            }
-            return proposal;
-          })
-      );
-
-      // Update the userVoted state for the voted proposal
-      setUserVoted({ ...userVoted, [proposalId]: true });
+      setProposals((prevProposals) => {
+        const updatedProposals = [...prevProposals];
+        const votedProposalIndex = prevProposals.findIndex((proposal) => proposal.id === proposalId);
+        if (votedProposalIndex !== -1) {
+          updatedProposals[votedProposalIndex] = {
+            ...updatedProposals[votedProposalIndex],
+            voteCount: updatedProposals[votedProposalIndex].voteCount + 1,
+          };
+        }
+        return updatedProposals;
+      });
 
     } catch (error) {
       console.error("Error while voting:", error.message || error);
     }
   };
+
 
 
 
@@ -317,18 +321,14 @@ const VotingApp = () => {
           {proposals.map((proposal) => (
               <li key={proposal.id}>
                 {proposal.description} - Votes: {proposal.voteCount}
-                <button
-                    onClick={() => vote(proposal.id)}
-                    disabled={userVoted[proposal.id] || false}
-                >
-                  Vote
-                </button>
+                <button onClick={() => vote(proposal.id)}>Vote</button>
               </li>
           ))}
         </ul>
 
       </div>
   );
+
 
 };
 

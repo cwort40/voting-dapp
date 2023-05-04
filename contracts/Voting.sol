@@ -8,7 +8,6 @@ contract Voting {
     }
 
     address public owner;
-    mapping(address => bool) public voters;
     mapping(uint => Proposal) public proposals;
     mapping(uint => mapping(address => bool)) public proposalVoters;
     uint public proposalsCount;
@@ -18,11 +17,6 @@ contract Voting {
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can call this function");
-        _;
-    }
-
-    modifier notVoted(address _voter) {
-        require(!voters[_voter], "Already voted");
         _;
     }
 
@@ -45,7 +39,6 @@ contract Voting {
 
         emit Voted(_proposalId, msg.sender);
     }
-
 
     function getProposal(uint _proposalId) public view returns (Proposal memory) {
         require(_proposalId > 0 && _proposalId <= proposalsCount, "Invalid proposal ID");
