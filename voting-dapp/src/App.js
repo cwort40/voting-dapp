@@ -11,6 +11,7 @@ const VotingApp = () => {
   const [proposalsCount, setProposalsCount] = useState(0); // eslint-disable-line no-unused-vars
   const [proposals, setProposals] = useState([]);
   const [description, setDescription] = useState("");
+  const [votedProposals, setVotedProposals] = useState({});
 
 
   useEffect(() => {
@@ -273,29 +274,48 @@ const VotingApp = () => {
     }
   };
 
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+
   const vote = async (proposalId) => {
     console.log("Voting for proposal ID:", proposalId);
 
     try {
-      await contract.methods.vote(proposalId).send({ from: accounts[0], gas: 5000000 });
+      if (!votedProposals[accounts[0]] || !votedProposals[accounts[0]][proposalId]) {
+        await contract.methods.vote(proposalId).send({ from: accounts[0], gas: 5000000 });
 
-      // Update the vote count for the voted proposal
-      setProposals((prevProposals) => {
-        const updatedProposals = [...prevProposals];
-        const votedProposalIndex = prevProposals.findIndex((proposal) => proposal.id === proposalId);
-        if (votedProposalIndex !== -1) {
-          updatedProposals[votedProposalIndex] = {
-            ...updatedProposals[votedProposalIndex],
-            voteCount: updatedProposals[votedProposalIndex].voteCount + 1,
-          };
-        }
-        return updatedProposals;
-      });
+        // Update the vote count for the voted proposal
+        setProposals((prevProposals) => {
+          const updatedProposals = [...prevProposals];
+          const votedProposalIndex = prevProposals.findIndex((proposal) => proposal.id === proposalId);
+          if (votedProposalIndex !== -1) {
+            updatedProposals[votedProposalIndex] = {
+              ...updatedProposals[votedProposalIndex],
+              voteCount: updatedProposals[votedProposalIndex].voteCount + 1,
+            };
+          }
+          return updatedProposals;
+        });
 
+        // Update the votedProposals state
+        setVotedProposals((prevVotedProposals) => ({
+          ...prevVotedProposals,
+          [accounts[0]]: {
+            ...(prevVotedProposals[accounts[0]] || {}),
+            [proposalId]: true,
+          },
+        }));
+      } else {
+        console.log('You have already voted on this proposal');
+        setModalMessage('You have already voted on this proposal');
+        setModalOpen(true);
+      }
     } catch (error) {
       console.error("Error while voting:", error.message || error);
     }
   };
+
+
 
 
 
@@ -325,6 +345,13 @@ const VotingApp = () => {
               </li>
           ))}
         </ul>
+
+        {modalOpen && (
+            <div className="modal">
+              <p>{modalMessage}</p>
+              <button onClick={() => setModalOpen(false)}>Close</button>
+            </div>
+        )}
 
       </div>
   );
